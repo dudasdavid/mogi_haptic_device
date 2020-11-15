@@ -1,0 +1,140 @@
+#! /usr/bin/env python3
+
+import time
+import serial
+
+from mogi_haptic_device.thread_wrapper import periodic
+
+import rospy
+from std_msgs.msg import String, UInt8, UInt8MultiArray, Float32, Float32MultiArray
+
+class HapticNode:
+
+    def __init__(self):
+        self.angles = [0.0, 0.0, 0.0, 0.0]
+        self.buttons = [0, 0, 0, 0, 0, 0]
+        self.feedback = 0
+        self.angles_to_send = Float32MultiArray()
+        self.buttons_to_send = UInt8MultiArray()
+
+        #debug
+        self.angle1_to_send = Float32()
+        self.angle2_to_send = Float32()
+        self.angle3_to_send = Float32()
+        self.angle4_to_send = Float32()
+                    
+    def main(self):                      
+        self.anglePub  = rospy.Publisher('/mogi_haptic/joint_angles', Float32MultiArray, queue_size=1)
+        self.buttonPub = rospy.Publisher('/mogi_haptic/button_states', UInt8MultiArray, queue_size=1)
+
+        #debug
+        self.angle1Pub = rospy.Publisher('/mogi_haptic/joint1', Float32, queue_size=1)
+        self.angle2Pub = rospy.Publisher('/mogi_haptic/joint2', Float32, queue_size=1)
+        self.angle3Pub = rospy.Publisher('/mogi_haptic/joint3', Float32, queue_size=1)
+        self.angle4Pub = rospy.Publisher('/mogi_haptic/joint4', Float32, queue_size=1)
+                                        
+        rospy.init_node('mogi_haptic_driver')
+        self.nodeName = rospy.get_name()
+        rospy.loginfo("{0} started".format(self.nodeName))
+
+        rospy.Subscriber("/mogi_haptic/feedback_request", UInt8, self.feedbackCallback)
+
+        self.serialPort = rospy.get_param('~serial_port', '/dev/ttyACM0')
+        self.publishRate = float(rospy.get_param('~publish_rate', 50.0)) # in Hz
+        self.serialRate = float(rospy.get_param('~serial_rate', 50.0))    # in Hz
+
+        self.ser = serial.Serial(
+            port=self.serialPort,
+            baudrate=115200,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS
+        )
+
+        self.ser.close()
+        self.ser.open()
+        self.ser.isOpen()
+
+        # there is a 0.01 wait time in USB comm thread
+        self.commThread = periodic(self.robotCommThread, (1.0/self.serialRate)-0.01, "Comm")
+        self.commThread.start()
+
+        rate = rospy.Rate(self.publishRate)
+        self.lastTwistTime = rospy.get_time()
+        while not rospy.is_shutdown():
+            self.publish()
+            rate.sleep()
+
+        self.commThread.exit()
+        self.ser.close()
+
+    def publish(self):
+        self.angles_to_send.data = self.angles
+        self.anglePub.publish(self.angles_to_send)
+        self.buttons_to_send.data = self.buttons
+        self.buttonPub.publish(self.buttons_to_send)
+
+        #debug
+        self.angle1_to_send.data = self.angles[0]
+        self.angle2_to_send.data = self.angles[1]
+        self.angle3_to_send.data = self.angles[2]
+        self.angle4_to_send.data = self.angles[3]
+        self.angle1Pub.publish(self.angle1_to_send)
+        self.angle2Pub.publish(self.angle2_to_send)
+        self.angle3Pub.publish(self.angle3_to_send)
+        self.angle4Pub.publish(self.angle4_to_send)
+
+    def feedbackCallback(self, value):
+        self.feedback = value
+        print(self.feedback)
+
+    def robotCommThread(self):
+     
+        command = "RDS"
+        self.ser.write(b"%s\r\n" % command.encode('ascii','ignore'))
+        
+        out = b''
+        time.sleep(0.01)
+        while self.ser.inWaiting() > 0:
+            out += self.ser.read(1)
+
+        if out != '':
+            #print(">> %s" % out)
+            out_splitted = str(out).split(";")
+            if out_splitted[0] == "b'OK":
+                #print(out_splitted)
+                command = out_splitted[1].split('\\r')[0]
+                if command == "RDS":
+                    self.angles[0] = int(out_splitted[2])/100.0
+                    self.angles[1] = int(out_splitted[3])/100.0
+                    self.angles[2] = int(out_splitted[4])/100.0
+                    self.angles[3] = int(out_splitted[5])/100.0
+
+                    self.buttons[0] = int(out_splitted[6])
+                    self.buttons[1] = int(out_splitted[7])
+                    self.buttons[2] = int(out_splitted[8])
+                    self.buttons[3] = int(out_splitted[9])
+                    self.buttons[4] = int(out_splitted[10])
+                    self.buttons[5] = int(out_splitted[11].split('\\r')[0])
+                else:
+                    print(">>INVALID COMMAND: %s" % out)
+            else:
+                print(">>NOT OK: %s" % out)
+
+
+
+
+
+
+
+if __name__ == '__main__':
+    try:
+        node = HapticNode()
+        node.main()
+    except rospy.ROSInterruptException:
+        pass
+
+
+
+    
+    
