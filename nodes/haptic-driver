@@ -40,8 +40,8 @@ class HapticNode:
         rospy.Subscriber("/mogi_haptic/feedback_request", UInt8, self.feedbackCallback)
 
         self.serialPort = rospy.get_param('~serial_port', '/dev/ttyACM0')
-        self.publishRate = float(rospy.get_param('~publish_rate', 50.0)) # in Hz
-        self.serialRate = float(rospy.get_param('~serial_rate', 50.0))    # in Hz
+        self.publishRate = float(rospy.get_param('~publish_rate', 5.0)) # in Hz
+        self.serialRate = float(rospy.get_param('~serial_rate', 10.0))    # in Hz
 
         self.ser = serial.Serial(
             port=self.serialPort,
@@ -60,10 +60,11 @@ class HapticNode:
         self.commThread.start()
 
         rate = rospy.Rate(self.publishRate)
-        self.lastTwistTime = rospy.get_time()
         while not rospy.is_shutdown():
             self.publish()
             rate.sleep()
+
+        print("Stopped")
 
         self.commThread.exit()
         self.ser.close()
@@ -75,10 +76,10 @@ class HapticNode:
         self.buttonPub.publish(self.buttons_to_send)
 
         #debug
-        self.angle1_to_send.data = self.angles[0]
-        self.angle2_to_send.data = self.angles[1]
-        self.angle3_to_send.data = self.angles[2]
-        self.angle4_to_send.data = self.angles[3]
+        self.angle1_to_send.data = self.angles[0]*180.0/3.14 # convert to deg
+        self.angle2_to_send.data = self.angles[1]*180.0/3.14
+        self.angle3_to_send.data = self.angles[2]*180.0/3.14
+        self.angle4_to_send.data = self.angles[3]*180.0/3.14
         self.angle1Pub.publish(self.angle1_to_send)
         self.angle2Pub.publish(self.angle2_to_send)
         self.angle3Pub.publish(self.angle3_to_send)
@@ -105,10 +106,10 @@ class HapticNode:
                 #print(out_splitted)
                 command = out_splitted[1].split('\\r')[0]
                 if command == "RDS":
-                    self.angles[0] = int(out_splitted[2])/100.0
-                    self.angles[1] = int(out_splitted[3])/100.0
-                    self.angles[2] = int(out_splitted[4])/100.0
-                    self.angles[3] = int(out_splitted[5])/100.0
+                    self.angles[0] = int(out_splitted[2])/100.0*3.14/180.0 # convert to rad
+                    self.angles[1] = int(out_splitted[3])/100.0*3.14/180.0
+                    self.angles[2] = int(out_splitted[4])/100.0*3.14/180.0
+                    self.angles[3] = int(out_splitted[5])/100.0*3.14/180.0
 
                     self.buttons[0] = int(out_splitted[6])
                     self.buttons[1] = int(out_splitted[7])
