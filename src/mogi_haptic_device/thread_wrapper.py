@@ -4,7 +4,7 @@ import time
 import traceback
 from threading import Event, Thread, Lock
 
-from rover_s_node.logger import Logger
+from mogi_haptic_device.logger import Logger
 
 
 def _call_callbacks(cb_list):
