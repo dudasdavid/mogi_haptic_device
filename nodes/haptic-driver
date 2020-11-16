@@ -14,6 +14,8 @@ class HapticNode:
         self.angles = [0.0, 0.0, 0.0, 0.0]
         self.buttons = [0, 0, 0, 0, 0, 0]
         self.feedback = 0
+        self.lastFeedback = 0
+        self.commandQueue = []
         self.angles_to_send = Float32MultiArray()
         self.buttons_to_send = UInt8MultiArray()
 
@@ -37,7 +39,7 @@ class HapticNode:
         self.nodeName = rospy.get_name()
         rospy.loginfo("{0} started".format(self.nodeName))
 
-        rospy.Subscriber("/mogi_haptic/feedback_request", UInt8, self.feedbackCallback)
+        #rospy.Subscriber("/mogi_haptic/feedback_request", UInt8, self.feedbackCallback)
 
         self.serialPort = rospy.get_param('~serial_port', '/dev/ttyACM0')
         self.publishRate = float(rospy.get_param('~publish_rate', 5.0)) # in Hz
@@ -70,6 +72,8 @@ class HapticNode:
         self.ser.close()
 
     def publish(self):
+
+        print("kaka")
         self.angles_to_send.data = self.angles
         self.anglePub.publish(self.angles_to_send)
         self.buttons_to_send.data = self.buttons
@@ -85,48 +89,58 @@ class HapticNode:
         self.angle3Pub.publish(self.angle3_to_send)
         self.angle4Pub.publish(self.angle4_to_send)
 
-    def feedbackCallback(self, value):
-        self.feedback = value
+    def feedbackCallback(self, data):
+        self.feedback = data.data
         print(self.feedback)
+        if self.lastFeedback != self.feedback:
+            self.commandQueue.append("SFB")
+            self.lastFeedback = self.feedback
 
     def robotCommThread(self):
      
-        command = "RDS"
-        self.ser.write(b"%s\r\n" % command.encode('ascii','ignore'))
-        
-        out = b''
-        time.sleep(0.01)
-        while self.ser.inWaiting() > 0:
-            out += self.ser.read(1)
+        try:
+            if len(self.commandQueue) == 0:
+                self.commandQueue.append("RDS")
+            
+            command = self.commandQueue.pop(0)
+            if command == "SFB":
+                command = "SFB%03d" % (self.feedback)
 
-        if out != '':
-            #print(">> %s" % out)
-            out_splitted = str(out).split(";")
-            if out_splitted[0] == "b'OK":
-                #print(out_splitted)
-                command = out_splitted[1].split('\\r')[0]
-                if command == "RDS":
-                    self.angles[0] = int(out_splitted[2])/100.0*3.14/180.0 # convert to rad
-                    self.angles[1] = int(out_splitted[3])/100.0*3.14/180.0
-                    self.angles[2] = int(out_splitted[4])/100.0*3.14/180.0
-                    self.angles[3] = int(out_splitted[5])/100.0*3.14/180.0
+            #print(command)
 
-                    self.buttons[0] = int(out_splitted[6])
-                    self.buttons[1] = int(out_splitted[7])
-                    self.buttons[2] = int(out_splitted[8])
-                    self.buttons[3] = int(out_splitted[9])
-                    self.buttons[4] = int(out_splitted[10])
-                    self.buttons[5] = int(out_splitted[11].split('\\r')[0])
+            self.ser.write(b"%s\r\n" % command.encode('ascii','ignore'))
+            
+            out = b''
+            time.sleep(0.01)
+            while self.ser.inWaiting() > 0:
+                out += self.ser.read(1)
+
+            if out != '':
+                #print(">> %s" % out)
+                out_splitted = str(out).split(";")
+                if out_splitted[0] == "b'OK":
+                    #print(out_splitted)
+                    command = out_splitted[1].split('\\r')[0]
+                    if command == "RDS":
+                        self.angles[0] = int(out_splitted[2])/100.0*3.14/180.0 # convert to rad
+                        self.angles[1] = int(out_splitted[3])/100.0*3.14/180.0
+                        self.angles[2] = int(out_splitted[4])/100.0*3.14/180.0
+                        self.angles[3] = int(out_splitted[5])/100.0*3.14/180.0
+
+                        self.buttons[0] = int(out_splitted[6])
+                        self.buttons[1] = int(out_splitted[7])
+                        self.buttons[2] = int(out_splitted[8])
+                        self.buttons[3] = int(out_splitted[9])
+                        self.buttons[4] = int(out_splitted[10])
+                        self.buttons[5] = int(out_splitted[11].split('\\r')[0])
+                    elif command == "SFB":
+                        pass
+                    else:
+                        print(">>INVALID COMMAND: %s" % out)
                 else:
-                    print(">>INVALID COMMAND: %s" % out)
-            else:
-                print(">>NOT OK: %s" % out)
-
-
-
-
-
-
+                    print(">>NOT OK: %s" % out)
+        except:
+            print("exception")
 
 if __name__ == '__main__':
     try:
