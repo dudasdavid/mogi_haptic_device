@@ -39,10 +39,10 @@ class HapticNode:
         self.nodeName = rospy.get_name()
         rospy.loginfo("{0} started".format(self.nodeName))
 
-        #rospy.Subscriber("/mogi_haptic/feedback_request", UInt8, self.feedbackCallback)
+        rospy.Subscriber("/mogi_haptic/feedback_request", UInt8, self.feedbackCallback)
 
         self.serialPort = rospy.get_param('~serial_port', '/dev/ttyACM0')
-        self.publishRate = float(rospy.get_param('~publish_rate', 5.0)) # in Hz
+        self.publishRate = float(rospy.get_param('~publish_rate', 20.0)) # in Hz
         self.serialRate = float(rospy.get_param('~serial_rate', 10.0))    # in Hz
 
         self.ser = serial.Serial(
@@ -64,7 +64,10 @@ class HapticNode:
         rate = rospy.Rate(self.publishRate)
         while not rospy.is_shutdown():
             self.publish()
-            rate.sleep()
+            try:
+                rate.sleep()
+            except:
+                print("Ctrl+C occured")
 
         print("Stopped")
 
@@ -73,7 +76,6 @@ class HapticNode:
 
     def publish(self):
 
-        print("kaka")
         self.angles_to_send.data = self.angles
         self.anglePub.publish(self.angles_to_send)
         self.buttons_to_send.data = self.buttons
@@ -91,7 +93,7 @@ class HapticNode:
 
     def feedbackCallback(self, data):
         self.feedback = data.data
-        print(self.feedback)
+        #print(self.feedback)
         if self.lastFeedback != self.feedback:
             self.commandQueue.append("SFB")
             self.lastFeedback = self.feedback
