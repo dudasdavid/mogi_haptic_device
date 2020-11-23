@@ -42,8 +42,8 @@ class HapticNode:
         rospy.Subscriber("/mogi_haptic/feedback_request", UInt8, self.feedbackCallback)
 
         self.serialPort = rospy.get_param('~serial_port', '/dev/ttyACM0')
-        self.publishRate = float(rospy.get_param('~publish_rate', 20.0)) # in Hz
-        self.serialRate = float(rospy.get_param('~serial_rate', 10.0))    # in Hz
+        self.publishRate = float(rospy.get_param('~publish_rate', 100.0)) # in Hz
+        self.serialRate = float(rospy.get_param('~serial_rate', 100.0))    # in Hz
 
         self.ser = serial.Serial(
             port=self.serialPort,
