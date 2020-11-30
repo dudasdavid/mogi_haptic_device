@@ -113,7 +113,7 @@ class HapticNode:
             self.ser.write(b"%s\r\n" % command.encode('ascii','ignore'))
             
             out = b''
-            time.sleep(0.01)
+            time.sleep(0.008)
             while self.ser.inWaiting() > 0:
                 out += self.ser.read(1)
 
