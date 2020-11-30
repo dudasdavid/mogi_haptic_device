@@ -140,7 +140,8 @@ class HapticNode:
                     else:
                         print(">>INVALID COMMAND: %s" % out)
                 else:
-                    print(">>NOT OK: %s" % out)
+                    pass
+                    #print(">>NOT OK: %s" % out)
         except:
             print("exception")
 
