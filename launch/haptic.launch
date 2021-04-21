@@ -3,7 +3,7 @@
 
   <arg name="serial_port" value="/dev/ttyACM0" />
 
-  <node name="haptic_driver" pkg="mogi_haptic_device" type="haptic_driver" output="screen">
+  <node name="haptic_driver" pkg="mogi_haptic_device" type="haptic-driver" output="screen">
     <rosparam subst_value="true">
       serial_port: $(arg serial_port)
       publish_rate: 50.0
