@@ -2,6 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Int8
 from builtin_interfaces.msg import Time
 import serial
 import math
@@ -10,6 +11,7 @@ class SerialDriverNode(Node):
     def __init__(self):
         super().__init__("serial_haptic_driver")
         self.publisher_ = self.create_publisher(JointState, 'joint_states', 10)
+        self.speed_publisher_ = self.create_publisher(Int8, 'joint_speed', 10)
         self.r_timer = self.create_timer(0.01, self.reader_callback)
         self.w_timer = self.create_timer(0.2, self.writer_callback)
         self.p_timer = self.create_timer(0.05, self.publisher_callback)
@@ -42,7 +44,13 @@ class SerialDriverNode(Node):
         self.joint_angles = [0.0,0.0,0.0,0.0,0.0]
         self.speed = 100
         self.buttons = [0,0,0,0]
-        self.gripper_gain = 1.68
+        self.gripper_gain = 1.85
+
+        # TODO: These offsets should come from a calibration file
+        self.joint0_offset = 0.0
+        self.joint1_offset = 0.0
+        self.joint2_offset = 3.0
+        self.joint3_offset = 0.0
 
         self.serial.close()
         self.serial.open()
@@ -60,10 +68,10 @@ class SerialDriverNode(Node):
                 #self.get_logger().info(line)
                 parts = line.split(';')
                 if parts[0] == "ANG":
-                    self.joint_angles[0] = float(parts[1])/100.0
-                    self.joint_angles[1] = float(parts[2])/100.0
-                    self.joint_angles[2] = float(parts[3])/100.0
-                    self.joint_angles[3] = float(parts[4])/100.0
+                    self.joint_angles[0] = float(parts[1])/100.0 + self.joint0_offset
+                    self.joint_angles[1] = float(parts[2])/100.0 + self.joint1_offset
+                    self.joint_angles[2] = float(parts[3])/100.0 + self.joint2_offset
+                    self.joint_angles[3] = float(parts[4])/100.0 + self.joint3_offset
                     self.joint_angles[4] = float(parts[5])/100.0*self.gripper_gain
                 else:
                     self.get_logger().warning("Unknown angle message received: " + line)
@@ -106,6 +114,10 @@ class SerialDriverNode(Node):
         msg.effort = []
 
         self.publisher_.publish(msg)
+
+        msg = Int8()
+        msg.data = self.speed
+        self.speed_publisher_.publish(msg)
 
 
 def main(args=None):
