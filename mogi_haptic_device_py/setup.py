@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'serial_driver = mogi_haptic_device_py.serial_driver:main',
+            'first_gen_driver = mogi_haptic_device_py.first_gen_driver:main',
         ],
     },
 )
