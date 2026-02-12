@@ -47,11 +47,11 @@ class SerialDriverNode(Node):
         self.joint_angles = [0.0,0.0,0.0,0.0,0.0]
         self.speed = 100
         self.buttons = [0,0,0,0]
-        self.gripper_gain = 1.85
+        self.gripper_gain = 0.6
 
         # TODO: These offsets should come from a calibration file
         self.joint0_offset = 0.0
-        self.joint1_offset = 0.0
+        self.joint1_offset = -0.0
         self.joint2_offset = 3.0
         self.joint3_offset = 0.0
 
