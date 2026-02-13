@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-set -euo pipefail
+#set -euo pipefail
 
-REPO="/home/david/ros2_ws/src/ROS2-lessons/mogi_haptic_device"
-WS="/home/david/ros2_ws"
+REPO="/home/robotlabor/ros2_ws/src/mogi_haptic_device"
+WS="/home/robotlabor/ros2_ws"
 
 echo "=== Updating repo ==="
 cd "$REPO"
 
 # If you want it to always update the currently checked-out branch:
 git status
-git pull --rebase
+git pull
 
 echo
 echo "=== Rebuilding workspace ==="
@@ -19,7 +19,7 @@ cd "$WS"
 source /opt/ros/jazzy/setup.bash
 
 # Build (adjust packages-select if you only want this package)
-colcon build --symlink-install
+colcon build
 
 echo
 echo "=== Done! ==="
