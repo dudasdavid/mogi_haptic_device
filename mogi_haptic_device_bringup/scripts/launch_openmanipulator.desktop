@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Launch OpenManipulator
+Comment="Launch the ROS 2 application"
+Terminal=true
+Exec=bash -lc '/home/robotlabor/robot_app/launch_openmanipulator.sh; echo; echo "Press Enter to close..."; read'
+Icon=utilities-terminal
+Categories=Development;
+

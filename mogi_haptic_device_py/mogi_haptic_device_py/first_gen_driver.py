@@ -27,8 +27,9 @@ class SerialDriverNode(Node):
 
         self.position_publisher = self.create_publisher(TelemanipulatorPosition, 'telemanipulator_position', 10)
         self.r_timer = self.create_timer(0.01, self.reader_callback)
-        self.w_timer = self.create_timer(0.2, self.writer_callback)
-        self.p_timer = self.create_timer(0.05, self.publisher_callback)
+        self.w_timer = self.create_timer(0.02, self.writer_callback)
+        self.p_timer = self.create_timer(0.02, self.publisher_callback)
+        self.g_timer = self.create_timer(0.02, self.gripper_callback)
 
         self.serialPort = '/dev/ttyACM0'
 
@@ -41,18 +42,16 @@ class SerialDriverNode(Node):
             timeout=1
         )
 
+        self.header = False
+        self.out = []
+        self.send_open_gripper = False
+        self.send_close_gripper = False
+
         self.joint_names = ['joint1', 'joint2', 'joint3', 'joint4']
 
         self.status = 1 # 1: not active, 2: active
         self.joint_angles = [0.0,0.0,0.0,0.0]
         self.buttons = [0,0,0,0,0,0]
-        self.gripper_gain = 0.6
-
-        # TODO: These offsets should come from a calibration file
-        self.joint0_offset = 0.0
-        self.joint1_offset = -0.0
-        self.joint2_offset = 3.0
-        self.joint3_offset = 0.0
 
         self.serial.close()
         self.serial.open()
@@ -61,41 +60,51 @@ class SerialDriverNode(Node):
         self.get_logger().info("Serial driver has been started.")
 
     def reader_callback(self):
-        out = []
-        out.append(self.serial.read_until())
 
-        for line in out:
+        self.out = []
+        self.out.append(self.serial.read_until())
+
+        for line in self.out:
+            print(line, len(self.out))
             line = line.decode('utf-8').rstrip()
             try:
                 if line != "":
-                    #self.get_logger().info(line)
+
+                    if line == "OK;RDS":
+                        continue
+
                     parts = line.split(';')
-                    if parts[0] == "ANG":
-                        self.joint_angles[0] = float(parts[1])/100.0 + self.joint0_offset
-                        self.joint_angles[1] = float(parts[2])/100.0 + self.joint1_offset
-                        self.joint_angles[2] = float(parts[3])/100.0 + self.joint2_offset
-                        self.joint_angles[3] = float(parts[4])/100.0 + self.joint3_offset
-                        self.joint_angles[4] = float(parts[5])/100.0*self.gripper_gain
-                    else:
-                        self.get_logger().warning("Unknown angle message received: " + line)
 
-                    if parts[6] == "SPD":
-                        self.speed = int(parts[7])
-                    else:
-                        self.get_logger().warning("Unknown speed message received: " + line)
+                    if len(parts) == 11:
+                        self.joint_angles[0] = float(parts[1])/100.0*3.14/180.0
+                        self.joint_angles[1] = float(parts[2])/100.0*3.14/180.0
+                        self.joint_angles[2] = float(parts[3])/100.0*3.14/180.0
+                        self.joint_angles[3] = float(parts[4])/100.0*3.14/180.0
+                        self.buttons[0] = int(parts[5])
+                        self.buttons[1] = int(parts[6])
+                        self.buttons[2] = int(parts[7])
+                        self.buttons[3] = int(parts[8])
+                        self.buttons[4] = int(parts[9])
+                        self.buttons[5] = int(parts[10])
 
-                    if parts[8] == "BTN":
-                        self.buttons[0] = int(parts[9])
-                        self.buttons[1] = int(parts[10])
-                        self.buttons[2] = int(parts[11])
-                        self.buttons[3] = int(parts[12])
-                    else:
-                        self.get_logger().warning("Unknown button message received: " + line)
+                        if self.buttons[3] == 1:
+                            self.status = 1
+                        elif self.buttons[2] == 1:
+                            self.status = 2
 
-                    if parts[13] == "END":
-                        pass
+                        if self.buttons[0] == 1:
+                            self.send_open_gripper = True
+                            self.send_close_gripper = False
+                        elif self.buttons[1] == 1:
+                            self.send_open_gripper = False
+                            self.send_close_gripper = True
+                        else:
+                            self.send_open_gripper = False
+                            self.send_close_gripper = False
+
                     else:
-                        self.get_logger().warning("Unknown end message received: " + line)
+                        self.get_logger().warning("Unknown message received: " + line)
+
             except Exception as e:
                 self.get_logger().error("Error parsing message: " + str(e) + " Line: " + line)
 
@@ -107,23 +116,28 @@ class SerialDriverNode(Node):
 
     def publisher_callback(self):
         if self.status == 2:
-            msg = JointState()
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.name = self.joint_names
+            msg = JointTrajectory()
+            msg.joint_names = self.joint_names
+            point = JointTrajectoryPoint()
+            point.positions = self.joint_angles
+            point.time_from_start.sec = 0
+            msg.points.append(point)
+            self.arm_publisher.publish(msg)
 
-            joint_angles_rad = [math.radians(angle) for angle in self.joint_angles]
+    def gripper_callback(self):
+        if self.send_close_gripper or self.send_open_gripper:
+            goal_msg = GripperCommand.Goal()
+            if self.send_close_gripper:
+                goal_msg.command.position = 0.019
+            else:
+                goal_msg.command.position = -0.008
+            goal_msg.command.max_effort = 10.0
 
-            msg.position = [joint_angles_rad[0], joint_angles_rad[1], joint_angles_rad[2], joint_angles_rad[3], joint_angles_rad[4], -joint_angles_rad[4], joint_angles_rad[4], -joint_angles_rad[4], -joint_angles_rad[4], joint_angles_rad[4]]  # Duplicate and invert as needed
+            self.gripper_client.wait_for_server()
+            send_goal_future = self.gripper_client.send_goal_async(goal_msg)
+            #rclpy.spin_until_future_complete(self, send_goal_future)
 
-            # You can add velocities/efforts if needed
-            msg.velocity = []
-            msg.effort = []
-
-            self.publisher_.publish(msg)
-
-        msg = Int8()
-        msg.data = self.speed
-        self.speed_publisher_.publish(msg)
+            
 
 
 def main(args=None):
