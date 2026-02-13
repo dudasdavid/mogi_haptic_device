@@ -65,7 +65,7 @@ class SerialDriverNode(Node):
         self.out.append(self.serial.read_until())
 
         for line in self.out:
-            print(line, len(self.out))
+            #print(line, len(self.out))
             line = line.decode('utf-8').rstrip()
             try:
                 if line != "":
