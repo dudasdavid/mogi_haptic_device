@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Launch RoArm
+Comment="Launch the ROS 2 application"
+Terminal=true
+Exec=bash -lc '/home/david/ros_app/launch_roarm.sh; echo; echo "Press Enter to close..."; read'
+Icon=utilities-terminal
+Categories=Development;
+

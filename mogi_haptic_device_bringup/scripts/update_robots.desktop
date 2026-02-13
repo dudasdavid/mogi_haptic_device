@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Update Robots
+Comment=Pull latest code and rebuild ROS2 workspace
+Terminal=true
+Exec=bash -lc '/home/david/ros_app/update_haptic_device.sh; echo; echo "Press Enter to close..."; read'
+Icon=system-software-update
+Categories=Development;
